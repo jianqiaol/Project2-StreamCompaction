@@ -10,14 +10,14 @@
 
 using namespace std;
 
-const int n_input=200;
+const int n_input=1000000;
 const int iters=1000;
 const int threadsPerBlock=512;
 
 #define CPU_SCAN			1;
 #define GPU_NAIVE			1;
-#define GPU_SHARED_NAIVE	1;
-#define GPU_SHARED_OP		1;
+#define GPU_SHARED_NAIVE	0;
+#define GPU_SHARED_LG		1;
 #define CPU_SCATTER			1;
 
 
@@ -60,7 +60,83 @@ __global__ void scan_GPU_shared_naive(int *input, int *output, int n)
 	output[idx]=sdata[out*n+idx];
 }
 
-__global__ void scan_GPU_shared_LG()
+__global__ void scan_GPU_shared_LG(int *input,int *output,int *aux,int n)
+{
+	extern __shared__ int sdata[];
+	int idx=blockDim.x*blockIdx.x+threadIdx.x;
+	int out=0,in=1;
+	if(idx<n)
+	{
+		sdata[threadIdx.x]=input[idx];
+		sdata[n+threadIdx.x]=0;
+	}
+	for(int d=1;d<n;d*=2)
+	{
+		out=1-out;
+		in=1-out;
+		if(threadIdx.x>=d && idx<n)
+			sdata[out*n+threadIdx.x]=sdata[in*n+threadIdx.x]+sdata[in*n+threadIdx.x-d];
+		else
+			sdata[out*n+threadIdx.x]=sdata[in*n+threadIdx.x];
+		__syncthreads();
+	}
+	output[idx]=sdata[out*n+threadIdx.x];
+	if(blockIdx.x<n_input/threadsPerBlock)
+		aux[blockIdx.x]=sdata[out*n+blockDim.x-1];
+}	
+
+__global__ void scan_GPU_shared_LG_add(int *input,int *output,int *aux,int n)
+{
+	int idx=blockDim.x*blockIdx.x+threadIdx.x;
+	if(idx<n)
+	{
+		if(blockIdx.x>0)
+			output[idx]=output[idx]-input[idx]+aux[blockIdx.x-1];
+		else
+			output[idx]=output[idx]-input[idx]; 
+	}
+}
+
+void scan_GPU_LG(int *input,int *output)
+{
+	int dimBlock=threadsPerBlock;
+	int dimGrid=(n_input+dimBlock-1)/dimBlock;
+	int *d_aux;
+	cudaMalloc(&d_aux,dimGrid*sizeof(int));
+	scan_GPU_shared_LG<<<dimGrid,dimBlock,2*n_input*sizeof(int)>>>(input,output,d_aux,n_input);
+	scan_GPU_shared_LG_add<<<dimGrid,dimBlock>>>(input,output,d_aux,n_input);
+}
+
+__global__ void scatter_GPU(int *input,int *output,int n)
+{
+	int idx=blockDim.x*blockIdx.x+threadIdx.x;
+	if(idx<n)
+		output[idx]=(input[idx]>0)?1:0;
+}
+
+__global__ void streamCompactGPU(int *input,int *sum, int *inbool, int *output,int n)
+{
+	int idx=blockDim.x*blockIdx.x+threadIdx.x;
+	if(idx<n-1)
+		if(sum[idx]!=sum[idx+1])
+			output[sum[idx]]=input[idx];
+	if(idx==n-1)
+		if(inbool[idx])
+			output[sum[idx]]=input[idx];
+
+}
+
+void streamCompact(int *input,int *output)
+{
+	int dimBlock=threadsPerBlock;
+	int dimGrid=(n_input+dimBlock-1)/dimBlock;
+	int *d_sum,*d_bool;
+	cudaMalloc(&d_sum,dimGrid*sizeof(int));
+	cudaMalloc(&d_bool,dimGrid*sizeof(int));
+	scatter_GPU<<<dimGrid,dimBlock>>>(input,d_bool,n_input);
+	scan_GPU_LG(d_bool,d_sum);
+	streamCompactGPU<<<dimGrid,dimBlock>>>(input,d_sum,d_bool,output,n_input);
+}
 //
 //__global__ void scan_GPU_shared_op(int *input,int *output,int n)
 //{
@@ -97,11 +173,12 @@ int main()
 	int *aux=new int[n_input];
 	int *scan=new int[n_input];
 	int *scatter=new int[n_input];
-	int *d_a,*d_scan,*d_aux;
+	int *d_a,*d_scan,*d_stream;
 	float time=0.0f;
 	cudaMalloc(&d_a,n_input*sizeof(int));
 	cudaMalloc(&d_scan,n_input*sizeof(int));
-	cudaMalloc(&d_aux,n_input*sizeof(int));
+	cudaMalloc(&d_stream,n_input*sizeof(int));
+	
 
 	cudaEvent_t start, stop;
     cudaEventCreate(&start);
@@ -147,7 +224,7 @@ int main()
 		scan_CPU(a,scan,n_input);
 	clock_t end=clock();
 	cout<<"Runtime for "<<iters<<" iters="<<end-begin<<" ms"<<endl;
-	postprocess(answer_scan,scan,n_input);
+	//postprocess(answer_scan,scan,n_input);
 #endif
 
 
@@ -168,7 +245,7 @@ int main()
     cudaEventElapsedTime( &time, start, stop);
 	cout << "Runtime for " << iters << " iters=" << time << " ms" << endl;
 	cudaMemcpy(scan,d_scan,n_input*sizeof(int),cudaMemcpyDeviceToHost);
-	postprocess(answer_scan,scan,n_input);
+	//postprocess(answer_scan,scan,n_input);
 #endif
 
 
@@ -189,8 +266,26 @@ int main()
     cudaEventElapsedTime( &time, start, stop);
 	cout << "Runtime for " << iters << " iters=" << time << " ms" << endl;
 	cudaMemcpy(scan,d_scan,n_input*sizeof(int),cudaMemcpyDeviceToHost);
-	postprocess(answer_scan,scan,n_input);
+	//postprocess(answer_scan,scan,n_input);
 #endif
+
+
+#if GPU_SHARED_LG
+	cout<<"----------------------"<<endl;
+	cout<<"GPU scan with shared memory for large array"<<endl;
+	cudaEventRecord(start, 0);
+	for(int k=0;k<iters;k++)
+		scan_GPU_LG(d_a,d_scan);
+	cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop );
+	time=0.0f;
+    cudaEventElapsedTime( &time, start, stop);
+	cout<<"Runtime for "<<iters<<" iters="<<time<<" ms"<<endl;
+	cudaMemcpy(scan,d_scan,n_input*sizeof(int),cudaMemcpyDeviceToHost);
+	//postprocess(answer_scan,scan,n_input);
+
+#endif
+
 
 #if CPU_SCATTER
 	//CPU scan
@@ -201,9 +296,10 @@ int main()
 		scatter_CPU(a,scatter,n_input);
 	end=clock();
 	cout<<"Runtime for "<<iters<<" iters="<<end-begin<<" ms"<<endl;
-	postprocess(answer_scatter,scatter,n_input);
+	//postprocess(answer_scatter,scatter,n_input);
 #endif
 
+	//streamCompact(d_a,d_stream);
 
 
 

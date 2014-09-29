@@ -6,7 +6,7 @@
 #include <iostream>
 #include <math.h>
 #include <cstdlib>
-
+using namespace std;
 
 //Check the result, this function is from shehzan's code in profiling and debugging lab
 void postprocess(const int *ref, const int *res, int n)
@@ -17,8 +17,8 @@ void postprocess(const int *ref, const int *res, int n)
         if (res[i] != ref[i])
         {
             printf("ID:%d \t Res:%d \t Ref:%d\n", i, res[i], ref[i]);
-			/*for(int j=0;j<n;j++)
-				cout<<ref[j]<<" "<<res[j]<<endl;*/
+			for(int j=0;j<n;j++)
+				cout<<ref[j]<<" "<<res[j]<<endl;
             printf("%25s\n", "*** FAILED ***");
             passed = false;
             break;
