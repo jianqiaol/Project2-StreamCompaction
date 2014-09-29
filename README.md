@@ -4,15 +4,15 @@ Project-2
 A Study in Parallel Algorithms : Stream Compaction
 
 # PART 2 : NAIVE PREFIX SUM
-We will now parallelize this the previous section's code.  Recall from lecture
-that we can parallelize this using a series of kernel calls.  In this portion,
-you are NOT allowed to use shared memory.
-
 ### Questions 
 * Compare this version to the serial version of exclusive prefix scan. Please
   include a table of how the runtimes compare on different lengths of arrays.
 * Plot a graph of the comparison and write a short explanation of the phenomenon you
   see here.
+
+![](https://raw.githubusercontent.com/jianqiaol/Project2-StreamCompaction/master/project2.png)
+
+
 
 # PART 3 : OPTIMIZING PREFIX SUM
 In the previous section we did not take into account shared memory.  In the
