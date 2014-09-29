@@ -12,6 +12,7 @@ A Study in Parallel Algorithms : Stream Compaction
 
 ![](https://raw.githubusercontent.com/jianqiaol/Project2-StreamCompaction/master/project2.png)
 
+Analysis: The CPU version of scan is actually very fast. I think me implementation of GPU version is not optimal at all. And there are lots of bank conflicts. 
 
 
 # PART 3 : OPTIMIZING PREFIX SUM
