@@ -3,11 +3,6 @@ Project-2
 
 A Study in Parallel Algorithms : Stream Compaction
 
-# PART 1 : REVIEW OF PREFIX SUM
-Given the definition of exclusive prefix sum, please write a serial CPU version
-of prefix sum.  You may write this in the cpp file to separate this from the
-CUDA code you will be writing in your .cu file. 
-
 # PART 2 : NAIVE PREFIX SUM
 We will now parallelize this the previous section's code.  Recall from lecture
 that we can parallelize this using a series of kernel calls.  In this portion,
