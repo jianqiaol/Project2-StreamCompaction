@@ -3,51 +3,17 @@ Project-2
 
 A Study in Parallel Algorithms : Stream Compaction
 
-# PART 2 : NAIVE PREFIX SUM
-### Questions 
-* Compare this version to the serial version of exclusive prefix scan. Please
-  include a table of how the runtimes compare on different lengths of arrays.
-* Plot a graph of the comparison and write a short explanation of the phenomenon you
-  see here.
 
+Comparison of CPU and GPU version for part 2 and part 3:
 ![](https://raw.githubusercontent.com/jianqiaol/Project2-StreamCompaction/master/project2.png)
 
-Analysis: The CPU version of scan is actually very fast. I think me implementation of GPU version is not optimal at all. And there are lots of bank conflicts. 
+Analysis: The CPU version of scan is actually very fast. I think me implementation of GPU version is not optimal at all.Still the one with shared memory works better than naive implementation when input size increases. And there are lots of bank conflicts. My function has wired behavior. With same input, it returns different output. Half times it gets the right answer, other time it just goes wrong from some points. I am still trying to figure out why. For naive implementation this only happens when input size is larger than the block size. I think this is caused by the threads cannot synchronize across blocks. But for the one using shared memory, even with input size smaller than block size, it still only working half time...
 
 
-# PART 3 : OPTIMIZING PREFIX SUM
-In the previous section we did not take into account shared memory.  In the
-previous section, we kept everything in global memory, which is much slower than
-shared memory.
-
-## PART 3a : Write prefix sum for a single block
-Shared memory is accessible to threads of a block. Please write a version of
-prefix sum that works on a single block.  
-
-## PART 3b : Generalizing to arrays of any length.
-Taking the previous portion, please write a version that generalizes prefix sum
-to arbitrary length arrays, this includes arrays that will not fit on one block.
-
-### Questions
-* Compare this version to the parallel prefix sum using global memory.
-* Plot a graph of the comparison and write a short explanation of the phenomenon
-  you see here.
 
 # PART 4 : ADDING SCATTER
-First create a serial version of scatter by expanding the serial version of
-prefix sum.  Then create a GPU version of scatter.  Combine the function call
-such that, given an array, you can call stream compact and it will compact the
-array for you.  Finally, write a version using thrust. 
-
-### Questions
-* Compare your version of stream compact to your version using thrust.  How do
-  they compare?  How might you optimize yours more, or how might thrust's stream
-  compact be optimized.
-
-# EXTRA CREDIT (+10)
-For extra credit, please optimize your prefix sum for work parallelism and to
-deal with bank conflicts.  Information on this can be found in the GPU Gems
-chapter listed in the references.  
+Since my scan is not always working, I cannot verify my scatter. But I think scatter itself is not hard if you have implemented scan. I haven't be able to use thrust, but I guess thrust's stream compact should be better. For my code, I would start optimize it from fix bank conflicts and implement the balanced tree algorithm. 
+ 
 
 # SUBMISSION
 Please answer all the questions in each of the subsections above and write your
